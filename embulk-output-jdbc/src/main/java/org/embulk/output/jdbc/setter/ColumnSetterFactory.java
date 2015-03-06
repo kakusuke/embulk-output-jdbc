@@ -1,10 +1,11 @@
 package org.embulk.output.jdbc.setter;
 
-import java.sql.Types;
-import org.embulk.spi.time.TimestampFormatter;
-import org.embulk.spi.PageReader;
 import org.embulk.output.jdbc.BatchInsert;
 import org.embulk.output.jdbc.JdbcColumn;
+import org.embulk.spi.PageReader;
+import org.embulk.spi.time.TimestampFormatter;
+
+import java.sql.Types;
 
 public class ColumnSetterFactory
 {
@@ -28,20 +29,17 @@ public class ColumnSetterFactory
     public ColumnSetter newColumnSetter(JdbcColumn column)
     {
         switch(column.getSqlType()) {
-        //// TODO
         // setByte
-        //case Types.TINYINT:
-        //    return new ByteColumnSetter(batch, pageReader, column);
+        case Types.TINYINT:
+            return new ByteColumnSetter(batch, pageReader, column);
 
-        //// TODO
-        //// setShort
-        //case Types.SMALLINT:
-        //    return new ShortColumnSetter(batch, pageReader, column);
+        // setShort
+        case Types.SMALLINT:
+            return new ShortColumnSetter(batch, pageReader, column);
 
-        //// TODO
-        //// setInt
-        //case Types.INTEGER:
-        //    return new IntColumnSetter(batch, pageReader, column);
+        // setInt
+        case Types.INTEGER:
+            return new IntColumnSetter(batch, pageReader, column);
 
         // setLong
         case Types.BIGINT:
@@ -52,7 +50,6 @@ public class ColumnSetterFactory
         case Types.FLOAT:
             return new DoubleColumnSetter(batch, pageReader, column);
 
-        // TODO
         //// setFloat
         //case Types.REAL:
         //    return new FloatColumnSetter(batch, pageReader, column);
@@ -96,11 +93,10 @@ public class ColumnSetterFactory
         case Types.NULL:
             return new NullColumnSetter(batch, pageReader, column);
 
-        // TODO
-        //// BigDecimal
-        //case Types.NUMERIC:
-        //case Types.DECIMAL:
-        //    return new BigDecimalColumnSetter(batch, pageReader, column);
+        // BigDecimal
+        case Types.NUMERIC:
+        case Types.DECIMAL:
+            return new BigDecimalColumnSetter(batch, pageReader, column);
 
         // others
         case Types.ARRAY:  // array
