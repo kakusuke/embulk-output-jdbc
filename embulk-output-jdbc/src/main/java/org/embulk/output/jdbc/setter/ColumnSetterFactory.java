@@ -51,8 +51,8 @@ public class ColumnSetterFactory
             return new DoubleColumnSetter(batch, pageReader, column);
 
         //// setFloat
-        //case Types.REAL:
-        //    return new FloatColumnSetter(batch, pageReader, column);
+        case Types.REAL:
+            return new FloatColumnSetter(batch, pageReader, column);
 
         // setBool
         case Types.BOOLEAN:
