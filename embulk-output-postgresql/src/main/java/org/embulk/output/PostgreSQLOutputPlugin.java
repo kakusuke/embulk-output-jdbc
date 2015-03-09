@@ -6,8 +6,11 @@ import org.embulk.output.jdbc.AbstractJdbcOutputPlugin;
 import org.embulk.output.jdbc.BatchInsert;
 import org.embulk.output.postgresql.PostgreSQLCopyBatchInsert;
 import org.embulk.output.postgresql.PostgreSQLOutputConnector;
+import org.embulk.spi.Exec;
+import org.embulk.spi.time.Timestamp;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.sql.SQLException;
 import java.util.Properties;
 
@@ -91,4 +94,23 @@ public class PostgreSQLOutputPlugin
         return new PostgreSQLCopyBatchInsert(getConnector(task, true));
     }
 
+    @Override
+    protected String generateSwapTableName(PluginTask task)
+    {
+        // postgresql table name byte length should be less than 64 byte.
+        // http://www.postgresql.org/docs/current/interactive/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
+        String tableName = task.getTable() + "_" + getTransactionUniqueName() + "_bulk_load_temp";
+        if (tableName.getBytes(Charset.forName("UTF-8")).length > 63) {
+            byte[] bytes = tableName.getBytes(Charset.forName("UTF-8"));
+            tableName = new String(bytes, 0, 63);
+        }
+        return tableName;
+    }
+
+    private String getTransactionUniqueName()
+    {
+        Timestamp t = Exec.session().getTransactionTime();
+        String tableName = String.format("%016x%08x", t.getEpochSecond(), t.getNano());
+        return new StringBuilder(tableName).reverse().toString();
+    }
 }
