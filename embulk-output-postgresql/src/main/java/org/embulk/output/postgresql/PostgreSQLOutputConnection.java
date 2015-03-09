@@ -1,14 +1,12 @@
 package org.embulk.output.postgresql;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
+import org.embulk.output.jdbc.JdbcOutputConnection;
+import org.embulk.output.jdbc.JdbcSchema;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
-import org.embulk.spi.Exec;
-import org.embulk.output.jdbc.JdbcOutputConnection;
-import org.embulk.output.jdbc.JdbcColumn;
-import org.embulk.output.jdbc.JdbcSchema;
+
+import java.sql.Connection;
+import java.sql.SQLException;
 
 public class PostgreSQLOutputConnection
         extends JdbcOutputConnection
@@ -53,5 +51,16 @@ public class PostgreSQLOutputConnection
         default:
             return typeName;
         }
+    }
+
+    @Override
+    protected String buildTruncateSql(String table)
+    {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("TRUNCATE ");
+        quoteIdentifierString(sb, table);
+
+        return sb.toString();
     }
 }

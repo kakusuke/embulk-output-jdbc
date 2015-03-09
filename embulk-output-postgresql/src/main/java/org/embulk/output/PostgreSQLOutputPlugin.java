@@ -1,15 +1,15 @@
 package org.embulk.output;
 
-import java.util.Properties;
-import java.io.IOException;
-import java.sql.SQLException;
-import org.embulk.spi.Exec;
 import org.embulk.config.Config;
 import org.embulk.config.ConfigDefault;
 import org.embulk.output.jdbc.AbstractJdbcOutputPlugin;
 import org.embulk.output.jdbc.BatchInsert;
-import org.embulk.output.postgresql.PostgreSQLOutputConnector;
 import org.embulk.output.postgresql.PostgreSQLCopyBatchInsert;
+import org.embulk.output.postgresql.PostgreSQLOutputConnector;
+
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.Properties;
 
 public class PostgreSQLOutputPlugin
         extends AbstractJdbcOutputPlugin
@@ -90,4 +90,5 @@ public class PostgreSQLOutputPlugin
     {
         return new PostgreSQLCopyBatchInsert(getConnector(task, true));
     }
+
 }

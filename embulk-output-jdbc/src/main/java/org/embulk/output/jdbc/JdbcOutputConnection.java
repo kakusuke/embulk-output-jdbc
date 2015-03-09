@@ -1,15 +1,9 @@
 package org.embulk.output.jdbc;
 
-import java.util.List;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-
-import org.slf4j.Logger;
 import org.embulk.spi.Exec;
+import org.slf4j.Logger;
+
+import java.sql.*;
 
 public class JdbcOutputConnection
         implements AutoCloseable
@@ -243,29 +237,30 @@ public class JdbcOutputConnection
         return ColumnDeclareType.SIMPLE;
     }
 
-    protected String buildInsertTableSql(String fromTable, JdbcSchema fromTableSchema, String toTable)
+    protected String buildInsertTableSql(String fromTable, JdbcSchema fromTableSchema, String toTable, JdbcSchema toTableSchema)
     {
         StringBuilder sb = new StringBuilder();
 
         sb.append("INSERT INTO ");
         quoteIdentifierString(sb, toTable);
         sb.append(" (");
-        boolean first = true;
-        for (JdbcColumn c : fromTableSchema.getColumns()) {
-            if (first) { first = false; }
-            else { sb.append(", "); }
-            quoteIdentifierString(sb, c.getName());
-        }
+        buildColumnNames(sb, toTableSchema);
         sb.append(") ");
         sb.append("SELECT ");
-        for (JdbcColumn c : fromTableSchema.getColumns()) {
-            if (first) { first = false; }
-            else { sb.append(", "); }
-            quoteIdentifierString(sb, c.getName());
-        }
+        buildColumnNames(sb, fromTableSchema);
         sb.append(" FROM ");
         quoteIdentifierString(sb, fromTable);
 
+        return sb.toString();
+    }
+    private String buildColumnNames(StringBuilder sb, JdbcSchema schema)
+    {
+        boolean first = true;
+        for (JdbcColumn c : schema.getColumns()) {
+            if (first) { first = false; }
+            else { sb.append(", "); }
+            quoteIdentifierString(sb, c.getName());
+        }
         return sb.toString();
     }
 
@@ -279,7 +274,7 @@ public class JdbcOutputConnection
         return sb.toString();
     }
 
-    protected void insertTable(String fromTable, JdbcSchema fromTableSchema, String toTable,
+    protected void insertTable(String fromTable, JdbcSchema fromTableSchema, String toTable, JdbcSchema toTableSchema,
             boolean truncateDestinationFirst) throws SQLException
     {
         Statement stmt = connection.createStatement();
@@ -288,7 +283,7 @@ public class JdbcOutputConnection
                 String sql = buildTruncateSql(toTable);
                 executeUpdate(stmt, sql);
             }
-            String sql = buildInsertTableSql(fromTable, fromTableSchema, toTable);
+            String sql = buildInsertTableSql(fromTable, fromTableSchema, toTable, toTableSchema);
             executeUpdate(stmt, sql);
             commitIfNecessary(connection);
         } catch (SQLException ex) {
@@ -314,15 +309,9 @@ public class JdbcOutputConnection
         quoteIdentifierString(sb, toTable);
 
         sb.append(" (");
-        for (int i=0; i < toTableSchema.getCount(); i++) {
-            if(i != 0) { sb.append(", "); }
-            quoteIdentifierString(sb, toTableSchema.getColumnName(i));
-        }
+        buildColumnNames(sb, toTableSchema);
         sb.append(") VALUES (");
-        for(int i=0; i < toTableSchema.getCount(); i++) {
-            if(i != 0) { sb.append(", "); }
-            sb.append("?");
-        }
+        buildColumnNames(sb, toTableSchema);
         sb.append(")");
 
         return sb.toString();

@@ -1,48 +1,25 @@
 package org.embulk.output.jdbc;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.io.IOException;
-import java.nio.file.Paths;
-import java.sql.Types;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.DatabaseMetaData;
-import java.sql.SQLException;
-
-import org.slf4j.Logger;
-
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-
-import org.embulk.config.CommitReport;
-import org.embulk.config.Config;
-import org.embulk.config.ConfigDefault;
-import org.embulk.config.ConfigDiff;
-import org.embulk.config.ConfigException;
-import org.embulk.config.ConfigSource;
-import org.embulk.config.Task;
-import org.embulk.config.TaskSource;
-import org.embulk.spi.Exec;
-import org.embulk.spi.Column;
-import org.embulk.spi.ColumnVisitor;
-import org.embulk.spi.OutputPlugin;
-import org.embulk.spi.PageOutput;
-import org.embulk.spi.PluginClassLoader;
-import org.embulk.spi.Schema;
-import org.embulk.spi.TransactionalPageOutput;
-import org.embulk.spi.Page;
-import org.embulk.spi.PageReader;
-import org.embulk.spi.time.Timestamp;
-import org.embulk.spi.time.TimestampFormatter;
+import org.embulk.config.*;
+import org.embulk.output.jdbc.RetryExecutor.IdempotentOperation;
 import org.embulk.output.jdbc.setter.ColumnSetter;
 import org.embulk.output.jdbc.setter.ColumnSetterFactory;
-import org.embulk.output.jdbc.RetryExecutor.IdempotentOperation;
+import org.embulk.spi.*;
+import org.embulk.spi.time.Timestamp;
+import org.embulk.spi.time.TimestampFormatter;
+import org.slf4j.Logger;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 import static org.embulk.output.jdbc.RetryExecutor.retryExecutor;
 
@@ -114,21 +91,58 @@ public abstract class AbstractJdbcOutputPlugin
 
     public enum Mode {
         INSERT,
-        INSERT_DIRECT,
-        TRUNCATE_INSERT,
+
+        INSERT_DIRECT
+        {
+            public boolean isDirectWrite()
+            {
+                return true;
+            }
+            public boolean isInplace()
+            {
+                return true;
+            }
+        },
+        TRUNCATE_INSERT
+        {
+            public boolean isInplace()
+            {
+                return true;
+            }
+            public boolean createAndSwapTable()
+            {
+                return true;
+            }
+        },
         MERGE,
-        REPLACE,
-        REPLACE_INPLACE;
+        REPLACE
+        {
+            public boolean createAndSwapTable()
+            {
+                return true;
+            }
+        },
+        REPLACE_INPLACE
+        {
+            public boolean isInplace()
+            {
+                return true;
+            }
+            public boolean createAndSwapTable()
+            {
+                return true;
+            }
+        };
         //REPLACE_PARTITIONING,  // MySQL: partitioning, PostgreSQL: inheritance
 
         public boolean isDirectWrite()
         {
-            return this == INSERT_DIRECT;
+            return false;
         }
 
         public boolean isInplace()
         {
-            return this == INSERT_DIRECT || this == REPLACE_INPLACE;
+            return false;
         }
 
         public boolean usesMultipleLoadTables()
@@ -138,7 +152,7 @@ public abstract class AbstractJdbcOutputPlugin
 
         public boolean createAndSwapTable()
         {
-            return this == REPLACE_INPLACE || this == REPLACE;
+            return false;
         }
     }
 
@@ -155,6 +169,9 @@ public abstract class AbstractJdbcOutputPlugin
             break;
         case "replace":
             task.setMode(Mode.REPLACE_INPLACE);
+            break;
+        case "truncate_insert":
+            task.setMode(Mode.TRUNCATE_INSERT);
             break;
         default:
             throw new ConfigException(String.format("Unknown mode '%s'. Supported modes are: insert, replace", task.getModeConfig()));
@@ -331,9 +348,9 @@ public abstract class AbstractJdbcOutputPlugin
             // already done
             break;
         case TRUNCATE_INSERT:
-            // truncate & aggregate insert into target
-            throw new UnsupportedOperationException("not implemented yet");
-            //break;
+            JdbcSchema toSchema = newJdbcSchemaFromExistentTable(con, task.getTable());
+            con.insertTable(task.getSwapTable().get(), task.getLoadSchema(), task.getTable(), toSchema, true);
+            break;
         case MERGE:
             // aggregate merge into target
             throw new UnsupportedOperationException("not implemented yet");
