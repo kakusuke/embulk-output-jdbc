@@ -249,7 +249,7 @@ public abstract class AbstractJdbcOutputPlugin
     }
 
     private ConfigDiff commit(final PluginTask task,
-            Schema schema, final int taskCount)
+            final Schema schema, final int taskCount)
     {
         if (!task.getMode().isDirectWrite()) {  // no intermediate data if isDirectWrite == true
             try {
@@ -258,7 +258,7 @@ public abstract class AbstractJdbcOutputPlugin
                     {
                         JdbcOutputConnection con = newConnection(task, false, false);
                         try {
-                            doCommit(con, task, taskCount);
+                            doCommit(con, task, schema, taskCount);
                         } finally {
                             con.close();
                         }
@@ -336,7 +336,7 @@ public abstract class AbstractJdbcOutputPlugin
     	return task.getTable() + "_" + getTransactionUniqueName() + "_bulk_load_temp";
     }
 
-    protected void doCommit(JdbcOutputConnection con, PluginTask task, int taskCount)
+    protected void doCommit(JdbcOutputConnection con, PluginTask task, Schema schema, int taskCount)
         throws SQLException
     {
         switch (task.getMode()) {
@@ -348,8 +348,14 @@ public abstract class AbstractJdbcOutputPlugin
             // already done
             break;
         case TRUNCATE_INSERT:
-            JdbcSchema toSchema = newJdbcSchemaFromExistentTable(con, task.getTable());
-            con.insertTable(task.getSwapTable().get(), task.getLoadSchema(), task.getTable(), toSchema, true);
+            if (con.tableExists(task.getTable())) {
+                JdbcSchema toSchema = newJdbcSchemaFromExistentTable(con, task.getTable());
+                con.insertTable(task.getSwapTable().get(), task.getLoadSchema(), task.getTable(), toSchema, true);
+            }
+            else {
+                JdbcSchema toSchema = newJdbcSchemaForNewTable(schema);
+                con.replaceTable(task.getSwapTable().get(), toSchema, task.getTable());
+            }
             break;
         case MERGE:
             // aggregate merge into target

@@ -80,6 +80,20 @@ public class JdbcOutputConnection
         executeUpdate(stmt, sql);
     }
 
+    public void truncateTableIfExists(String tableName) throws SQLException
+    {
+        Statement stmt = connection.createStatement();
+        try {
+            String sql = buildTruncateSql(tableName);
+            executeUpdate(stmt, sql);
+            commitIfNecessary(connection);
+        } catch (SQLException ex) {
+            throw safeRollback(connection, ex);
+        } finally {
+            stmt.close();
+        }
+    }
+
     public void dropTable(String tableName) throws SQLException
     {
         Statement stmt = connection.createStatement();
@@ -280,8 +294,7 @@ public class JdbcOutputConnection
         Statement stmt = connection.createStatement();
         try {
             if(truncateDestinationFirst) {
-                String sql = buildTruncateSql(toTable);
-                executeUpdate(stmt, sql);
+                truncateTableIfExists(toTable);
             }
             String sql = buildInsertTableSql(fromTable, fromTableSchema, toTable, toTableSchema);
             executeUpdate(stmt, sql);
