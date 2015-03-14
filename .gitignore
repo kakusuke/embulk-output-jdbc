@@ -1,7 +1,9 @@
 *~
+*.iml
 /pkg/
 /tmp/
 .gradle/
 classpath/
 build/
 .idea
+.DS_Store
